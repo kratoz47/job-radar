@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>岗位雷达 · 多平台职位扫描</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div>
+        <div class="brand-name">JOB RADAR</div>
+        <div class="brand-sub">多平台 · 关键词扫描</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <a href="#/overview" data-view="overview"><span class="ico">◧</span>概览<span class="nav-count" id="c-all"></span></a>
+      <a href="#/recommend" data-view="recommend"><span class="ico">★</span>投递建议</a>
+      <a href="#/local" data-view="local"><span class="ico">◉</span>昆明 · 云南<span class="nav-count" id="c-local"></span></a>
+      <a href="#/remote" data-view="remote"><span class="ico">⌂</span>全国远程<span class="nav-count" id="c-remote"></span></a>
+      <a href="#/overseas" data-view="overseas"><span class="ico">✈</span>海外远程<span class="nav-count" id="c-overseas"></span></a>
+      <a href="#/applications" data-view="applications"><span class="ico">✉</span>投递记录<span class="nav-count" id="c-apps"></span></a>
+      <a href="#/login" data-view="login"><span class="ico">⚿</span>平台登录</a>
+      <a href="#/settings" data-view="settings"><span class="ico">⚙</span>设置</a>
+    </nav>
+
+    <div class="side-foot">
+      <div class="scan-state" id="scanState">
+        <span class="dot"></span><span id="scanText">读取中…</span>
+      </div>
+      <button class="btn btn-scan" id="scanBtn">按方向重扫</button>
+      <div class="side-note">职友集 / 电鸭 / 远程.work / 海外站 / BOSS / 小红书</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="pageTitle">概览</h1>
+        <p id="pageSub">按关键词扫描多平台岗位</p>
+      </div>
+      <div class="topbar-actions">
+        <label class="search">
+          <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="globalSearch" placeholder="在当前结果中筛选…" autocomplete="off" title="只筛选已抓到的岗位，不会触发扫描" />
+        </label>
+      </div>
+    </header>
+
+    <div class="scope-bar" id="scopeBar"></div>
+
+    <section id="view" class="view"></section>
+  </main>
+</div>
+
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-inner" id="drawerInner"></div>
+</aside>
+<div class="scrim" id="scrim"></div>
+<div class="toast" id="toast"></div>
+
+<div class="modal-wrap" id="directionModal" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>调整搜索方向</h2>
+      <button class="modal-x" id="dirClose" aria-label="关闭">×</button>
+    </div>
+    <p class="dir-lead">搜索方向决定下一轮扫描抓什么。<b>保存方向不会改变现有岗位</b>；重新扫描才会按新方向重建列表、相关度和投递建议。</p>
+    <div class="dir-current" id="dirCurrent"></div>
+
+    <label class="dir-label">关键词 <span class="hint" id="dirCount"></span></label>
+    <div class="dir-chips" id="dirChips"></div>
+    <div class="dir-add">
+      <input class="input" id="dirInput" placeholder="输入关键词后回车，如 产品经理" />
+      <button class="btn btn-ghost btn-sm" id="dirAdd">添加</button>
+    </div>
+
+    <div class="dir-row">
+      <label>城市 <input class="input" id="dirCity" placeholder="昆明" /></label>
+      <label class="dir-check"><input type="checkbox" id="dirOverseas" /> 包含海外远程</label>
+    </div>
+
+    <div class="dir-impact" id="dirImpact"></div>
+
+    <label class="dir-confirm">
+      <input type="checkbox" id="dirConfirm" />
+      我确认：重新扫描会更新整个岗位列表、相关度和投递建议
+    </label>
+
+    <div class="dir-actions">
+      <button class="btn btn-ghost" id="dirCancel">取消</button>
+      <button class="btn btn-ghost" id="dirSave">仅保存方向</button>
+      <button class="btn btn-primary" id="dirRescan" disabled>保存并重新扫描</button>
+    </div>
+    <button class="dir-restore" id="dirRestore">恢复上一次搜索方向</button>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

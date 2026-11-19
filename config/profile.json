@@ -1,0 +1,66 @@
+{
+  "name": "你的名字",
+  "title": "AI 应用落地 / Forward Deployed / Agent 工作流",
+  "location": "昆明",
+  "remote": true,
+  "years": 3,
+  "education": "本科",
+  "english": "CET-6 · 可读英文文档",
+  "contact": {
+    "phone": "138 0000 0000",
+    "email": "you@example.com",
+    "site": "your.site",
+    "github": "github.com/yourname"
+  },
+  "skills": {
+    "agent": { "level": 2, "evidence": "做过 2 条 Agent 工作流" },
+    "llm-app": { "level": 2, "evidence": "接过 LLM API 做问答" },
+    "prompt": { "level": 2, "evidence": "写过可复用的 Prompt 模板" },
+    "api": { "level": 2, "evidence": "对接过 3 个第三方 API" },
+    "deploy": { "level": 1, "evidence": "用云主机部署过 demo" },
+    "python": { "level": 1, "evidence": "能写脚本" },
+    "data-analysis": { "level": 2, "evidence": "做过业务数据看板" },
+    "requirements": { "level": 3, "evidence": "能把业务需求拆成流程" },
+    "project": { "level": 2, "evidence": "独立交付过项目" },
+    "rag": { "level": 0, "evidence": "没做过 RAG" },
+    "finetune": { "level": 0, "evidence": "不做模型训练" },
+    "container": { "level": 0, "evidence": "没用过 Docker" },
+    "frontend": { "level": 0, "evidence": "不会前端" }
+  },
+  "keywords": ["Agent 工作流", "Prompt", "API 部署", "数据看板"],
+  "summary": [
+    "现在：独立把一条业务流程做成能上线的 Agent 工作流。",
+    "判断：AI 项目卡住，多半是流程没拆对、验收没定清。",
+    "作品：一个上线产品、两条内部工作流。",
+    "方向：FDE / AI 应用落地。"
+  ],
+  "experiences": [
+    {
+      "company": "公司 A",
+      "role": "AI 应用工程师",
+      "period": "2022 – 2024",
+      "bullets": [
+        "把客服问答做成 Agent 工作流，人工工单下降 40%。",
+        "接通内部系统 API，交付可用的数据看板。"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "项目 B（已上线）",
+      "period": "2024 – 至今",
+      "bullets": ["独立完成需求、Prompt、API 对接与部署。"]
+    }
+  ],
+  "educationHistory": [
+    { "school": "某某大学", "major": "计算机", "degree": "本科", "period": "2015 – 2019" }
+  ],
+  "languages": ["中文（母语）", "英语 CET-6"],
+  "targets": ["AI Agent", "FDE", "AI 应用落地"],
+  "method": [
+    ["01", "画流程、算人工：找值得交给 Agent 的环节"],
+    ["02", "定验收：产出什么、谁验收、看 3 个指标"],
+    ["03", "搭工作流：Prompt → 节点 → 人工兜底"],
+    ["04", "接 API 上线：部署、监控、按结果迭代"]
+  ]
+}

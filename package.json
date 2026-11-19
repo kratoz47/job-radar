@@ -1,0 +1,15 @@
+{
+  "name": "job-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "多平台岗位雷达：关键词扫描 + 聚合 + 简历匹配 + 定制简历 + 投递记录",
+  "scripts": {
+    "start": "node server.mjs",
+    "scan": "node scripts/scan.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "license": "MIT"
+}

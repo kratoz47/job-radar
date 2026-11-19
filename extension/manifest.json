@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Job Radar Bridge",
+  "version": "1.0",
+  "description": "把 BOSS 搜索页的岗位卡片回传到本地 Job Radar",
+  "permissions": [
+    "scripting",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.zhipin.com/*",
+    "http://127.0.0.1:7788/*",
+    "https://www.xiaohongshu.com/*"
+  ],
+  "background": {
+    "service_worker": "bg.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.zhipin.com/web/geek/job*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.xiaohongshu.com/search_result*"
+      ],
+      "js": [
+        "xhs.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
