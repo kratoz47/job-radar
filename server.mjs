@@ -33,6 +33,12 @@ if (process.env.RESUME_DIR) RESUME_DIRS.push(process.env.RESUME_DIR);
 const TAILORED_DIR = join(ROOT, 'data', 'tailored');
 const EMAIL_PATH = join(ROOT, 'data', 'email.json');
 
+function keywordCategories() {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, 'config', 'keyword-categories.json'), 'utf8'));
+  } catch { return { categories: [] }; }
+}
+
 function loadSearchConfig() {
   try {
     const raw = JSON.parse(getSetting('search_config') || 'null');
@@ -54,6 +60,10 @@ function maskEmail(c) {
     user: c.user, fromName: c.fromName || '', fromEmail: c.fromEmail || c.user,
   };
 }
+function safeTags(t) {
+  try { return JSON.parse(t || '[]'); } catch { return []; }
+}
+
 function extractEmail(text = '') {
   const m = String(text).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
   const bad = /(example\.|sentry|png|jpg|jpeg|gif|webp|@2x)/i;
@@ -242,6 +252,8 @@ const server = createServer(async (req, res) => {
           if (!Number.isFinite(m) || m < 0) return json(res, 400, { error: 'minSalary 不合法' });
           minSalary = m;
         }
+        const direction = q.get('direction') === '1';
+        const directionKeywords = direction ? loadSearchConfig().keywords : [];
         const result = queryJobs({
           channel,
           q: (q.get('q') || '').slice(0, 100),
@@ -251,8 +263,12 @@ const server = createServer(async (req, res) => {
           sort,
           limit: Math.min(200, Math.floor(limitRaw)),
           offset: Math.floor(offsetRaw),
+          keywords: directionKeywords,
         });
-        return json(res, 200, result);
+        if (directionKeywords.length) {
+          result.rows = result.rows.map(j => ({ ...j, relevance: scoreRelevance(j.title, j.tags, j.summary, directionKeywords).score }));
+        }
+        return json(res, 200, { ...result, directionKeywords });
       }
 
       const analysisMatch = path.match(/^\/api\/jobs\/(.+)\/analysis$/);
@@ -310,7 +326,12 @@ const server = createServer(async (req, res) => {
         return json(res, 200, job);
       }
 
-      if (path === '/api/stats') return json(res, 200, stats());
+      if (path === '/api/stats') {
+        const base = stats();
+        const keywords = loadSearchConfig().keywords;
+        const directionCount = queryJobs({ channel: 'all', keywords, sort: 'date', limit: 1, offset: 0 }).total;
+        return json(res, 200, { ...base, directionCount, directionKeywords: keywords });
+      }
 
       if (path === '/api/extension/ping' && req.method === 'POST') {
         let b = {};
@@ -552,6 +573,10 @@ async function runZhipinScan(b) {
         }
       }
 
+      if (path === '/api/keyword-categories') {
+        return json(res, 200, keywordCategories());
+      }
+
       if (path === '/api/search-config' && req.method === 'GET') {
         let lastScanConfig = null;
         try { lastScanConfig = JSON.parse(getSetting('last_scan_config') || 'null'); } catch { /* ignore */ }
@@ -683,7 +708,9 @@ async function runZhipinScan(b) {
 
       if (path === '/api/recommendations') {
         const hours = Math.max(20, Math.min(80, Number(url.searchParams.get('hours')) || 50));
-        return json(res, 200, buildRecommendations(allJobs(), { hours }));
+        const keywords = loadSearchConfig().keywords;
+        const jobs = allJobs().filter(j => scoreRelevance(j.title, safeTags(j.tags), j.summary, keywords).score >= 15);
+        return json(res, 200, { ...buildRecommendations(jobs, { hours }), directionKeywords: keywords });
       }
 
       if (path === '/api/scans') {

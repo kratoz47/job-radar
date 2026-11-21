@@ -26,7 +26,7 @@ const state = {
   offset: 0,
   limit: 60,
   loading: false,
-  filters: { q: '', source: 'all', relevant: false, sort: 'date', minSalary: '' },
+  filters: { q: '', source: 'all', relevant: false, sort: 'date', minSalary: '', directionOnly: true },
   scanRunning: false,
   resumes: [],
   applications: [],
@@ -35,6 +35,8 @@ const state = {
   emailConfig: null,
   searchConfig: null,
   directionDirty: localStorage.getItem('radar_direction_dirty') === '1',
+  categories: [],
+  dirCategory: '',
 };
 
 // ---------------- utils ----------------
@@ -120,6 +122,7 @@ function renderScopeBar() {
       ${directionSummaryHTML()}
       ${changed ? '<span class="scope-warn">方向已改 · 尚未重扫</span>' : ''}
       ${!hasScan ? '<span class="scope-warn">尚未扫描</span>' : ''}
+      ${state.stats?.directionCount != null ? `<span class="scope-meta">当前方向 ${state.stats.directionCount} 条</span>` : ''}
     </div>
     <div class="scope-actions">
       <button class="scope-change" id="scopeChange">调整方向</button>
@@ -136,7 +139,39 @@ function renderDirChips() {
     || '<span class="hint">还没有关键词</span>';
   $('#dirCount').textContent = `${dirDraft.keywords.length} / 10`;
   box.querySelectorAll('[data-dir-del]').forEach(b => {
-    b.onclick = () => { dirDraft.keywords.splice(Number(b.dataset.dirDel), 1); renderDirChips(); };
+    b.onclick = () => { dirDraft.keywords.splice(Number(b.dataset.dirDel), 1); renderDirChips(); renderDirCats(); updateDirImpact(); };
+  });
+}
+
+function renderDirCats() {
+  const box = $('#dirCats');
+  const sug = $('#dirSuggest');
+  if (!box || !dirDraft) return;
+  if (!state.categories.length) { box.innerHTML = '<span class="hint">分类加载中…</span>'; sug.innerHTML = ''; return; }
+  if (!state.dirCategory) {
+    const hit = state.categories.find(c => c.keywords.some(k => dirDraft.keywords.includes(k)));
+    state.dirCategory = hit?.id || state.categories[0].id;
+  }
+  box.innerHTML = state.categories.map(c => `<button type="button" class="dir-cat ${c.id === state.dirCategory ? 'active' : ''}" data-cat="${c.id}">${esc(c.name)}</button>`).join('');
+  box.querySelectorAll('[data-cat]').forEach(b => {
+    b.onclick = () => { state.dirCategory = b.dataset.cat; renderDirCats(); };
+  });
+  const cat = state.categories.find(c => c.id === state.dirCategory);
+  if (!cat) { sug.innerHTML = ''; return; }
+  sug.innerHTML = `<div class="dir-sug-head">${esc(cat.note || '')}</div>
+    <div class="dir-sug-list">${cat.keywords.map(k => {
+      const added = dirDraft.keywords.includes(k);
+      return `<button type="button" class="dir-sug ${added ? 'added' : ''}" data-sug="${esc(k)}" ${added ? 'disabled' : ''}>${added ? '✓ ' : '+ '}${esc(k)}</button>`;
+    }).join('')}</div>`;
+  sug.querySelectorAll('[data-sug]').forEach(b => {
+    b.onclick = () => {
+      if (!dirDraft || dirDraft.keywords.includes(b.dataset.sug)) return;
+      if (dirDraft.keywords.length >= 10) { toast('最多 10 个关键词', true); return; }
+      dirDraft.keywords.push(b.dataset.sug);
+      renderDirChips();
+      renderDirCats();
+      updateDirImpact();
+    };
   });
 }
 
@@ -150,16 +185,21 @@ function updateDirImpact() {
   $('#dirRescan').disabled = disabled || !$('#dirConfirm').checked;
 }
 
-function openDirection() {
+async function openDirection() {
   if (state.scanRunning) { toast('扫描进行中，结束后再调整方向', true); return; }
+  if (!state.categories.length) {
+    try { state.categories = (await api('/api/keyword-categories')).categories || []; } catch { /* ignore */ }
+  }
   const cfg = state.searchConfig || { keywords: [], city: '昆明', overseas: true };
   dirDraft = { keywords: [...(cfg.keywords || [])], city: cfg.city || '昆明', overseas: cfg.overseas !== false };
+  state.dirCategory = '';
   $('#dirCurrent').innerHTML = `当前保存：${directionSummaryHTML()}`;
   $('#dirCity').value = dirDraft.city;
   $('#dirOverseas').checked = dirDraft.overseas;
   $('#dirInput').value = '';
   $('#dirConfirm').checked = false;
   renderDirChips();
+  renderDirCats();
   updateDirImpact();
   $('#directionModal').classList.add('open');
   $('#directionModal').setAttribute('aria-hidden', 'false');
@@ -184,6 +224,8 @@ async function saveDirection({ rescan = false } = {}) {
   localStorage.setItem('radar_direction_dirty', '1');
   closeDirection();
   renderScopeBar();
+  state.recs = null;
+  if (['overview', 'local', 'remote', 'overseas', 'search', 'recommend'].includes(state.view)) await render();
   if (rescan) {
     toast('方向已保存，开始重扫');
     await startScan();
@@ -205,6 +247,7 @@ function bindDirectionModal() {
     }
     $('#dirInput').value = '';
     renderDirChips();
+    renderDirCats();
     updateDirImpact();
     $('#dirInput').focus();
   };
@@ -280,6 +323,7 @@ async function loadJobs(reset = true) {
     sort: state.filters.sort, limit: state.limit, offset: state.offset,
   });
   if (state.filters.relevant) p.set('relevant', '1');
+  if (state.filters.directionOnly) p.set('direction', '1');
   if (state.filters.minSalary) p.set('minSalary', state.filters.minSalary);
     const data = await api(`/api/jobs?${p}`);
     state.jobs = reset ? data.rows : state.jobs.concat(data.rows);
@@ -368,7 +412,7 @@ async function renderOverview() {
   $('#view').innerHTML = `
     ${warn}
     <div class="grid-stats">
-      ${statCard('岗位总数', fmtNum(total), '', `平均简历匹配 ${s.avgMatch ?? 0} · 全库去重`)}
+      ${statCard('岗位总数', fmtNum(total), '', `平均简历匹配 ${s.avgMatch ?? 0} · 全库；当前方向 ${s.directionCount ?? '—'} 条`)}
       ${statCard('24h 新增', fmtNum(s.fresh), '', '首次出现的岗位')}
       ${statCard('远程岗位', fmtNum(remote), '', `国内 ${s.byChannel.remote || 0} · 海外 ${s.byChannel.overseas || 0}`)}
       ${statCard('已投递', fmtNum(appliedN), '', (s.applied || []).length ? '含面试中 / Offer' : '点岗位卡片开始投递')}
@@ -515,7 +559,8 @@ async function renderJobs(reload = true) {
   const sources = ['all', 'jobui', 'chinahr', 'xhs', 'eleduck', 'yuancheng', 'zhipin', 'remoteok', 'remotive', 'jobicy', 'workingnomads'];
   $('#view').innerHTML = `
     <div class="toolbar">
-      <span class="result-count">共 <b>${state.total}</b> 个岗位</span>
+      <span class="result-count">${state.filters.directionOnly ? '当前方向' : '历史'}共 <b>${state.total}</b> 个岗位</span>
+      <label class="check"><input type="checkbox" id="fDirection" ${state.filters.directionOnly ? 'checked' : ''}/> 只看当前方向</label>
       <label class="check"><input type="checkbox" id="fRelevant" ${state.filters.relevant ? 'checked' : ''}/> 只看相关（≥30）</label>
       <select id="fSource">${sources.map(s => `<option value="${s}" ${state.filters.source === s ? 'selected' : ''}>${s === 'all' ? '全部来源' : SOURCE_NAME[s]}</option>`).join('')}</select>
       <select id="fSalary">
@@ -541,6 +586,7 @@ async function renderJobs(reload = true) {
       这不是抓漏了，而是本地供给确实薄。建议先投「全国远程」里匹配度 ≥60 的岗位，同时每周回来看一次本地新增。
     </div>` : ''}`;
 
+  $('#fDirection').onchange = (e) => { state.filters.directionOnly = e.target.checked; render(); };
   $('#fRelevant').onchange = (e) => { state.filters.relevant = e.target.checked; render(); };
   $('#fSource').onchange = (e) => { state.filters.source = e.target.value; render(); };
   $('#fSalary').onchange = (e) => { state.filters.minSalary = e.target.value; render(); };
@@ -548,11 +594,29 @@ async function renderJobs(reload = true) {
   $('#exportBtn').onclick = () => { location.href = '/api/export?format=csv'; };
   const more = $('#moreBtn');
   if (more) more.onclick = async () => { more.disabled = true; await loadJobs(false); await renderJobs(false); };
+  const emptyAll = $('#emptyAll');
+  if (emptyAll) emptyAll.onclick = () => { state.filters.directionOnly = false; render(); };
+  const emptyDir = $('#emptyDir');
+  if (emptyDir) emptyDir.onclick = openDirection;
 }
 
 function emptyState() {
-  if (state.filters.q) return `<div class="empty" style="grid-column:1/-1"><div class="big">⌕</div><h3>没有匹配「${esc(state.filters.q)}」的岗位</h3><p>换个关键词，或到「设置」看看数据源状态。</p></div>`;
-  return `<div class="empty" style="grid-column:1/-1"><div class="big">📡</div><h3>这个通道还没有岗位</h3><p>点左下角「立即扫描」抓一轮。职友集有频率限制，遇到验证码会冷却 3 小时，稍后再试即可。</p></div>`;
+  if (state.filters.q) return `<div class="empty" style="grid-column:1/-1"><div class="big">⌕</div><h3>当前方向里没有匹配「${esc(state.filters.q)}」的岗位</h3><p>这是当前搜索方向内的筛选结果；清空搜索框或切换「只看当前方向」查看历史岗位。</p></div>`;
+  if (state.filters.directionOnly) {
+    const kw = (state.searchConfig?.keywords || []).join(' / ') || '未设置';
+    const last = state.stats?.lastScan;
+    const errs = last?.stats?.errors || [];
+    return `<div class="empty" style="grid-column:1/-1">
+      <div class="big">⌕</div>
+      <h3>当前方向「${esc(kw)}」没有岗位</h3>
+      <p>列表默认只显示当前搜索方向，历史岗位不会混进来。上一轮扫描：新增 ${last?.stats?.added ?? '—'} 条，过滤 ${last?.stats?.dropped ?? '—'} 条${errs.length ? `；错误：${errs.map(esc).join('、')}` : ''}。</p>
+      <div class="apply-row" style="justify-content:center;margin-top:14px">
+        <button class="btn btn-primary btn-sm" id="emptyAll">显示本通道历史岗位</button>
+        <button class="btn btn-ghost btn-sm" id="emptyDir">调整搜索方向</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="empty" style="grid-column:1/-1"><div class="big">📡</div><h3>这个通道还没有岗位</h3><p>点左下角「按方向重扫」抓一轮。职友集有频率限制，遇到验证码会冷却 3 小时，稍后再试即可。</p></div>`;
 }
 
 // ---------------- 平台登录 ----------------
@@ -714,6 +778,7 @@ async function renderRecommend() {
   state.recs = await api(`/api/recommendations?hours=${state.recHours}`);
   const { high, stacking, stats } = state.recs;
   const budget = state.recHours;
+  const dirKw = (state.recs.directionKeywords || state.searchConfig?.keywords || []).join(' / ');
 
   const highCards = high.map(h => {
     const j = h.job;
@@ -738,7 +803,14 @@ async function renderRecommend() {
         <button class="btn btn-brass btn-sm" data-rec-apply="${esc(j.id)}">投递</button>
       </div>
     </article>`;
-  }).join('') || '<div class="empty" style="grid-column:1/-1;padding:30px">暂无高匹配岗位，先去扫一轮</div>';
+  }).join('') || `<div class="empty" style="grid-column:1/-1;padding:30px">
+    <h3>当前方向「${esc(dirKw)}」暂无高匹配岗位</h3>
+    <p>投递建议也只使用当前搜索方向，历史岗位不会混进来。可以先换方向，或去看全部岗位。</p>
+    <div class="apply-row" style="justify-content:center;margin-top:12px">
+      <button class="btn btn-primary btn-sm" id="recAll">显示本通道历史岗位</button>
+      <button class="btn btn-ghost btn-sm" id="recDir">调整搜索方向</button>
+    </div>
+  </div>`;
 
   const comboCards = stacking.combos.map((c, i) => `
     <div class="combo-card">
@@ -812,6 +884,10 @@ async function renderRecommend() {
     </div>`;
 
   $('#recRefresh').onclick = async () => { state.recs = null; await renderRecommend(); };
+  const recAll = $('#recAll');
+  if (recAll) recAll.onclick = () => { state.filters.directionOnly = false; location.hash = '#/local'; };
+  const recDir = $('#recDir');
+  if (recDir) recDir.onclick = openDirection;
   $$('[data-hours]').forEach(b => b.onclick = async () => {
     state.recHours = Number(b.dataset.hours);
     state.recs = null;
@@ -1441,6 +1517,7 @@ window.addEventListener('hashchange', route);
       api('/api/resumes').then(r => (state.resumes = r)),
       api('/api/email/config').then(r => (state.emailConfig = r)).catch(() => null),
       api('/api/search-config').then(r => (state.searchConfig = r)).catch(() => null),
+      api('/api/keyword-categories').then(r => (state.categories = r.categories || [])).catch(() => []),
     ]);
   } catch (e) { console.error(e); }
   const st = await api('/api/scan/status').catch(() => ({}));
